@@ -39,7 +39,6 @@ RUN dnf install -y 'dnf-command(config-manager)' && \
         libX11-devel libXcursor-devel libXinerama-devel libXrandr-devel \
         libXi-devel mesa-libGL-devel mesa-libGLU-devel \
         alsa-lib-devel pulseaudio-libs-devel \
-        dotnet-sdk-8.0 \
         ca-certificates && \
     dnf clean all && \
     pip3 install scons
@@ -49,16 +48,10 @@ COPY --from=godot-src . .
 
 RUN --mount=type=cache,target=/root/.cache/scons-godot \
     scons platform=linuxbsd target=editor \
-        module_mono_enabled=yes \
+        precision=double \
         accesskit=no \
         cache_path=/root/.cache/scons-godot \
         -j$(nproc)
-
-RUN bin/godot.linuxbsd.editor.x86_64.mono --headless \
-        --generate-mono-glue ./modules/mono/glue && \
-    python3 ./modules/mono/build_scripts/build_assemblies.py \
-        --godot-output-dir=./bin \
-        --godot-platform=linuxbsd
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
 FROM ${ALMA_IMAGE}
@@ -67,17 +60,14 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 RUN dnf install -y \
     mesa-libGL mesa-libGLU alsa-lib pulseaudio-libs \
-    libstdc++ libgcc ca-certificates \
-    dotnet-runtime-8.0 && \
+    libstdc++ libgcc ca-certificates && \
     dnf clean all && \
     useradd -r -s /bin/bash -m -d /home/vsekai vsekai
 
 COPY --from=godot-build \
-    /godot-src/bin/godot.linuxbsd.editor.x86_64.mono \
+    /godot-src/bin/godot.linuxbsd.editor.double.x86_64 \
     /usr/local/bin/godot
 RUN chmod +x /usr/local/bin/godot
-
-COPY --from=godot-build /godot-src/bin/GodotSharp /usr/local/bin/GodotSharp
 
 COPY --from=zone-console-build /build/zone_console /usr/local/bin/zone_console
 RUN chmod +x /usr/local/bin/zone_console

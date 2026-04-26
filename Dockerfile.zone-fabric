@@ -1,11 +1,13 @@
 # syntax=docker/dockerfile:1
-# zone-fabric: Godot headless + GodotSharp assemblies + zone_console.
+# zone-fabric: Godot headless (GDScript, no Mono) + zone_console.
 # One container per zone process.
 #
 # Build context layout:
-#   godot-bin/              — pre-built Godot Linux mono editor binary from CI
-#   godot-bin/GodotSharp/   — GodotSharp assemblies (built in CI after glue gen)
+#   godot-bin/              — pre-built Godot Linux editor binary from CI (non-Mono)
 #   zone_console/           — zone_console Elixir source tree
+#
+# The binary is the double-precision GDScript editor from the CI artifact
+# v-sekai-godot-linuxbsd: godot.linuxbsd.editor.double.x86_64
 
 ARG ELIXIR_IMAGE=elixir:1.17.3-otp-27
 ARG ALMA_IMAGE=almalinux:9
@@ -25,24 +27,15 @@ FROM ${ALMA_IMAGE}
 
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
-# .NET runtime required by Godot mono to load hostfxr at startup.
-# dotnet-runtime-8.0 is in AlmaLinux 9 AppStream; no extra repo needed.
 RUN dnf install -y \
     mesa-libGL mesa-libGLU alsa-lib pulseaudio-libs \
-    libstdc++ libgcc ca-certificates \
-    dotnet-runtime-8.0 && \
+    libstdc++ libgcc ca-certificates && \
     dnf clean all && \
     useradd -r -s /bin/bash -m -d /home/vsekai vsekai
 
-# Godot binary (pre-built linux mono editor from CI)
-COPY godot-bin/godot.linuxbsd.editor.x86_64.mono /usr/local/bin/godot
+# Godot binary — non-Mono GDScript editor from CI (no .NET dependency)
+COPY godot-bin/godot.linuxbsd.editor.double.x86_64 /usr/local/bin/godot
 RUN chmod +x /usr/local/bin/godot
-
-# GodotSharp assemblies — must sit next to the binary at GodotSharp/
-# Generated in CI via:
-#   godot --headless --generate-mono-glue modules/mono/glue
-#   python3 modules/mono/build_scripts/build_assemblies.py --godot-output-dir=./bin
-COPY godot-bin/GodotSharp /usr/local/bin/GodotSharp
 
 # zone_console management tool
 COPY --from=zone-console-build /build/zone_console /usr/local/bin/zone_console
